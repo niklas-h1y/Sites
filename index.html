@@ -42,14 +42,25 @@
       const status = document.getElementById("status");
       const list = document.getElementById("sites");
 
-      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/?ref=${branch}`, {
-        headers: { Accept: "application/vnd.github+json" }
-      })
-        .then(response => {
+      Promise.all([
+        fetch(`https://api.github.com/repos/${owner}/${repo}/contents/?ref=${branch}`, {
+          headers: { Accept: "application/vnd.github+json" }
+        }).then(response => {
           if (!response.ok) throw new Error("The page list could not be loaded.");
           return response.json();
-        })
-        .then(files => {
+        }),
+        fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/categories.txt`)
+          .then(response => response.ok ? response.text() : "")
+          .catch(() => "")
+      ])
+        .then(([files, categoryText]) => {
+          // Line format: 1: Category name |  (1 maps to index2.html)
+          const categoryNames = new Map();
+          for (const line of categoryText.split(/\r?\n/)) {
+            const match = line.match(/^\s*(\d+)\s*:\s*(.*?)\s*\|\s*$/);
+            if (match && match[2]) categoryNames.set(Number(match[1]) + 1, match[2]);
+          }
+
           const pages = files
             .filter(file => file.type === "file" && /^index[2-9][0-9]*\.html$/i.test(file.name))
             .sort((a, b) => Number(a.name.match(/^index(\d+)/i)[1]) - Number(b.name.match(/^index(\d+)/i)[1]));
@@ -67,12 +78,13 @@
           }
 
           for (const page of pages) {
+            const pageNumber = Number(page.name.match(/^index(\d+)/i)[1]);
             const link = document.createElement("a");
             link.className = "site";
             link.href = page.name;
             const label = document.createElement("span");
             label.className = "site-name";
-            label.textContent = page.name.replace(/\.html$/i, "");
+            label.textContent = categoryNames.get(pageNumber) || `Category ${pageNumber - 1}`;
             const filename = document.createElement("span");
             filename.className = "site-file";
             filename.textContent = page.name;
