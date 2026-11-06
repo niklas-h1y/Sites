@@ -10,9 +10,15 @@ on:
 permissions:
   contents: write
 
+# Avoid two uploads trying to allocate the same indexN.html filename.
+concurrency:
+  group: collect-index-files-main
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
