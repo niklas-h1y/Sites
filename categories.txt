@@ -2,7 +2,7 @@
 # 1 = index2.html, 2 = index3.html, 3 = index4.html, and so on.
 # Add as many lines as you need. Keep the | at the end of each line.
 
-1: Example | 
-2: Encoder | 
+1: Unicode Fold | 
+2: Text-Sound Encoder | 
 3: Wikipedia Example Page |
 4: Google Page |
