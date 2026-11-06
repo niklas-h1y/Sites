@@ -1,0 +1,69 @@
+name: Collect uploaded index files
+
+on:
+  push:
+    paths:
+      - '**/index.html'
+      - 'index.html'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Move submitted index files to the repository root
+        id: collect
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # On a manual run, inspect the current commit. On a push, inspect
+          # only index.html files introduced or changed by that push.
+          if [[ -z "${BEFORE:-}" || "$BEFORE" =~ ^0+$ ]]; then
+            mapfile -t candidates < <(git ls-files --cached --others --exclude-standard -- '*index.html' 'index.html' | sort -u)
+          else
+            mapfile -t candidates < <(git diff --name-only "$BEFORE" "$AFTER" -- ':(glob)**/index.html' 'index.html' | sort -u)
+          fi
+
+          moved=0
+          for source in "${candidates[@]}"; do
+            [[ "$source" == "index.html" ]] && continue
+            [[ -f "$source" ]] || continue
+
+            if [[ ! -e "index.html" ]]; then
+              destination="index.html"
+            else
+              number=2
+              while [[ -e "index${number}.html" ]]; do
+                number=$((number + 1))
+              done
+              destination="index${number}.html"
+            fi
+
+            cp -- "$source" "$destination"
+            rm -- "$source"
+            echo "Moved $source -> $destination"
+            moved=$((moved + 1))
+          done
+
+          echo "moved=$moved" >> "$GITHUB_OUTPUT"
+
+      - name: Commit collected files
+        if: steps.collect.outputs.moved != '0'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Collect uploaded index files"
+          git push
